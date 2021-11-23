@@ -1,5 +1,5 @@
 class ExecutionSummary:
-    def __init__(self, solution=0, value=0, steps=0, name='unnamed', interval_history=[]):
+    def __init__(self, solution=0, value=0, steps=0, name='unnamed', interval_history=None):
         self.name = name
         self.solution = 0
         self.value = 0
@@ -9,7 +9,7 @@ class ExecutionSummary:
         self.dfx_times = 0
         self.ddfx_times = 0
         self.history = {}
-        self.interval_history = interval_history
+        self.interval_history = interval_history if interval_history is not None else []
         self.gamma_x_value_history = []
         self.simplex_high_history_indexes = []
         self.done = True
