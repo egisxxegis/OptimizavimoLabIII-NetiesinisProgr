@@ -13,6 +13,11 @@ class ExecutionSummary:
         self.gamma_x_value_history = []
         self.simplex_high_history_indexes = []
         self.done = True
+        self.r_start = 0
+        self.r_end = 0
+        self.r_iterations = 0
+        self.translated = []
+        self.translated_fx = 0
 
     def set_results(self, solution, value, steps):
         self.solution = solution

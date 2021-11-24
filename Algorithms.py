@@ -2,31 +2,8 @@ import copy
 
 from Point import Point
 from ExecutionSummary import ExecutionSummary
-from tabulate import tabulate
 import numpy as np
-
-
-def print_summary(*args):
-    headers = ["Name", "Solution", "f(X)", "Steps (N)", "f calls", "df calls", "edges length", "volume"]
-    if len(args) < 1:
-        print(tabulate([], headers=headers))
-        return
-    # Use a breakpoint in the code line below to debug your script.
-    data = []
-    print('Name, Solution, f(X), volume')
-    for argument in args:
-        data.append([argument.name,
-                     argument.solution,
-                     argument.value,
-                     argument.steps,
-                     argument.fx_times,
-                     argument.dfx_times,
-                     argument.translated,
-                     argument.translated_fx]
-                    )
-        print(f'{argument.name}, {argument.solution}, {argument.value}, {argument.translated_fx}')
-    print('\n\n')
-    print(tabulate(data, headers=headers))
+from R import R
 
 
 def dividing_into_halves(left_coord, right_coord, process_function, length_boundary):
@@ -264,7 +241,7 @@ def deformed_simplex(process_function, x0, start_length, stop_length,
     def _calculate_values():
         for i in range(vertices_c):
             if needs_recalculate[i]:
-                values[i] = process_function(*vertices[i])
+                values[i] = process_function(*(vertices[i]))
                 needs_recalculate[i] = False
 
     def _get_high_low_g():
@@ -351,3 +328,45 @@ def deformed_simplex(process_function, x0, start_length, stop_length,
     summary.solution = vertices[x_low_i]
     summary.value = values[x_low_i]
     return summary
+
+
+def nonlinear_solve(point: [float, float, float], writeable_r: R, penalty_f, grad_penalty, proc_f, epsilon=1e-4):
+    start_r = writeable_r.value
+    summary = ExecutionSummary()
+    summary.solution = point
+    old_summary = ExecutionSummary()
+    use_simplex = True if np.linalg.norm(grad_penalty(point), ord=None) < epsilon else False
+    used_method = 'simplex' if use_simplex else 'the fastest descend'
+    print(f"\n\n----\nstarting at {summary.solution} with {used_method}")
+
+    def local_solve_at(start_point):
+        if use_simplex:
+            return deformed_simplex(penalty_f, start_point, 0.01, epsilon)
+        else:
+            return the_fastest_descend(penalty_f, grad_penalty, start_point, epsilon)
+
+    neighbor_solutions = [0, epsilon*8, epsilon*4]
+    while True:
+        old_summary.r_iterations += 1
+        summary = local_solve_at(summary.solution)
+        print(f'with r = {writeable_r.value}, the sol: {summary.solution} of B(X) value {summary.value}')
+        old_summary.steps += summary.steps
+        old_summary.fx_times += summary.fx_times
+        old_summary.dfx_times += summary.dfx_times
+        old_summary.ddfx_times += summary.ddfx_times
+        old_summary.solution = summary.solution
+        old_summary.value = summary.value
+        neighbor_solutions.pop(0)
+        neighbor_solutions.append(old_summary.value)
+        if abs(neighbor_solutions[2] - neighbor_solutions[0]) < epsilon and \
+                abs(neighbor_solutions[2] - neighbor_solutions[1]) < epsilon:
+            break
+        writeable_r.value *= writeable_r.multiplier
+
+    old_summary.translated = point
+    old_summary.r_start = start_r
+    old_summary.r_end = writeable_r.value
+    old_summary.translated_fx = proc_f(*old_summary.solution) *-1
+    old_summary.name = used_method
+    writeable_r.value = start_r
+    return old_summary

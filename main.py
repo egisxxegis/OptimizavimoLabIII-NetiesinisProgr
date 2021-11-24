@@ -1,103 +1,100 @@
-import sys
-
-from sympy import Symbol, lambdify, solve
+from sympy import Symbol, lambdify
 from sympy.parsing.sympy_parser import parse_expr
 
 from Algorithms import *
-from presentation import prepare_contour, summary_to_graph, summary_simplex_to_graph, gamma_to_graph
+from presentation import print_summary
 
 if __name__ == '__main__':
 
     LSP = '1813056'
-    LSP_a = int(LSP[5])
-    LSP_b = int(LSP[6])
+    LSP_a = int(LSP[4])
+    LSP_b = int(LSP[5])
+    LSP_c = int(LSP[6])
 
     variables = {'x': Symbol('x', real=True),
                  'y': Symbol('y', real=True),
                  'z': Symbol('z', real=True)
                  }
     variables_f = {
-        'fx': Symbol('fx', real=True),
         'g1x': Symbol('g1x', real=True),
         'h1x': Symbol('h1x', real=True),
         'h2x': Symbol('h2x', real=True),
         'h3x': Symbol('h3x', real=True)
+    }
+    variables_bx = {
+        'fx': Symbol('fx', real=True),
+        'bx': Symbol('bx', real=True),
+        'r': Symbol('r', real=True)
     }
     form_fx = parse_expr('-(x * y * z)', variables)
     form_g1x = parse_expr('2 * (x * y + x * z + y * z) - 1', variables)
     form_h1x = parse_expr('x * y * -1', variables)
     form_h2x = parse_expr('x * z * -1', variables)
     form_h3x = parse_expr('x * y * z * -1', variables)
-    form_bx = parse_expr('g1x**2 ')
+    form_bx = parse_expr('g1x**2 + Max(0, h1x)**2 + Max(0, h2x)**2 + Max(0, h3x)**2', variables_f)
+    form_penalty = parse_expr('fx + 1/r * bx', variables_bx)
 
-    # form_z = solve(form_fx_restriction, variables['z'])[0]
-    # form_fx = form_fx.subs(variables['z'], form_z)
-    # variables.pop('z')
+    form_bx = form_bx.subs([
+        (variables_f['g1x'], form_g1x),
+        (variables_f['h1x'], form_h1x),
+        (variables_f['h2x'], form_h2x),
+        (variables_f['h3x'], form_h3x)
+    ])
+    form_penalty = form_penalty.subs([
+        (variables_bx['bx'], form_bx),
+        (variables_bx['fx'], form_fx)
+    ])
 
-    # fx = lambdify(variables.values(), form_fx, "numpy")
-    # form_dfx = [form_fx.diff(the_symbol) for the_symbol in variables.values()]
-    # dfx = [lambdify([v for v in variables.values()],
-    #                 the_dfx,
-    #                 "numpy")
-    #        for the_dfx in form_dfx]
-    #
-    # def gradient_fx(values):
-    #     return np.array([de_fx(*values) for de_fx in dfx])
-    #
-    # def two_arguments_to_edges(the_x, the_y):
-    #     the_z = form_z.subs([(variables['x'], the_x), (variables['y'], the_y)])
-    #     the_mult = the_z * the_x * the_y
-    #     if the_mult == 0:
-    #         return 0, 0, 0
-    #     the_length = (the_x * the_z / the_y / 2)**0.5
-    #     the_width = (the_y * the_z / the_x / 2)**0.5
-    #     the_height = (the_x * the_y / the_z / 2)**0.5
-    #     return the_length, the_width, the_height
-    #
-    # print(f'LSP: {LSP}')
-    # print(f'a={LSP_a} ; b={LSP_b}')
-    # print('\n\n')
-    #
-    # near_zero = sys.float_info.min * sys.float_info.epsilon
-    # near_zero2 = 1e-16
-    # near_zero3 = 1e-6
-    # start_length = 0.09
-    # gamma_step = 3.8  # 3.8
-    # gradient_stop = near_zero2
-    # stop_line = 1e-8  # 1e-8
-    #
-    # x0 = [0, 0]
-    # x1 = [1, 1]
-    # xm = [LSP_a/10, LSP_b/10]
-    # xs = [x0, x1, xm]
-    #
-    # print("X, f(X), gradf(X)")
-    # for x in xs:
-    #     print(f"{x}, "
-    #           f"{fx(*x)}, "
-    #           f"{gradient_fx(x)}")
-    #
-    # xs_summary = []
-    # for x in xs:
-    #     xs_summary.append(
-    #         [
-    #             gradient_descend(fx, gradient_fx, x, stop_line, gamma_step=gamma_step),
-    #             the_fastest_descend(fx, gradient_fx, x, stop_line),
-    #             deformed_simplex(fx, x, start_length, stop_line, step_limit=189999)
-    #         ]
-    #     )
-    #
-    # x_experiments = [(xs[ii], xs_summary[ii]) for ii in range(len(xs))]
-    #
-    # for start_point, summaries in x_experiments:
-    #     for summary in summaries:
-    #         summary.translated = two_arguments_to_edges(*summary.solution)
-    #         volume = 1
-    #         for edge in summary.translated:
-    #             volume *= edge
-    #         summary.translated_fx = volume
-    #     print(f"\n-------------Summary---------\n"
-    #           f"Starting point = {start_point}")
-    #     print_summary(*summaries)
-    #     print(f'-----------------------------\n')
-    #
+    end_variable_values = [x for x in variables.values()] + [variables_bx['r']]
+
+    fx = lambdify(variables.values(), form_fx, "numpy")
+    Bx = lambdify(end_variable_values, form_penalty, "numpy")
+
+    the_r = R()
+
+    points = [[0, 0, 0],
+              [1, 1, 1],
+              [LSP_a / 10, LSP_b / 10, LSP_c / 10]
+              ]
+
+    epsilon = 1e-4
+    the_r.value = 2
+    the_r.multiplier = 0.2
+
+    modules = [{'Heaviside': lambda x: np.heaviside(x, 1)}, 'numpy']
+    form_dpenalty = [form_penalty.diff(the_symbol) for the_symbol in variables.values()]
+    dpenalty = [lambdify(end_variable_values,
+                         form_de_penalty,
+                         modules)
+                for form_de_penalty in form_dpenalty
+                ]
+
+    def gradient_penalty(values):
+        return np.array([de_penalty(*values, the_r.value) for de_penalty in dpenalty])
+
+    def call_penalty(*values):
+        return Bx(*values, the_r.value)
+
+    summaries = []
+    for point in points:
+        summaries.append(nonlinear_solve(point, the_r, call_penalty, gradient_penalty, fx, epsilon))
+
+    print_summary(*summaries)
+
+    # #    experiment. different r, r_mult, point
+    # import warnings
+    # warnings.filterwarnings("error")
+    # summaries = []
+    # r = [8, 6, 2, 1, 0.9, 0.8]
+    # r_mult = [0.9, 0.8, 0.5, 0.2]
+    # for rv in r:
+    #     for rm in r_mult:
+    #         the_r.value = rv
+    #         the_r.multiplier = rm
+    #         for point in points:
+    #             try:
+    #                 summaries.append(nonlinear_solve(point, the_r, call_penalty, gradient_penalty, fx, epsilon))
+    #             except RuntimeWarning:
+    #                 summaries.append(ExecutionSummary(name='?', solution='?', value='?', steps='?'))
+    #             summaries[-1].r_start = str(summaries[-1].r_start) + f" rm: {rm}"
+    # print_summary(*summaries)

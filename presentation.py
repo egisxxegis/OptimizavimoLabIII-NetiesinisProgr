@@ -1,6 +1,7 @@
 import numpy as np
 import pylab
 from matplotlib import pyplot as plot
+from tabulate import tabulate
 
 from ExecutionSummary import ExecutionSummary
 
@@ -125,3 +126,34 @@ def gamma_to_graph(the_summary: ExecutionSummary, color="r-"):
     the_max_y = the_max_y*1.1 if the_max_y*1.1 > 31 else 31
     pylab.ylim(0, the_max_y)
     plot.plot(the_xs, the_ys, color, label=the_summary.name + '. gamma')
+
+
+def print_summary(*args: ExecutionSummary):
+    headers = ["Starting point", "Start r", "End r",
+               "Iterations",
+               "Solution", "B(X, r)",
+               "Steps (N)", "f calls", "df calls",
+               "Volume (V)", "Backbone method"]
+
+    if len(args) < 1:
+        print(tabulate([], headers=headers))
+        return
+    # Use a breakpoint in the code line below to debug your script.
+    data = []
+    # print('Name, Solution, f(X), volume')
+    for argument in args:
+        data.append([argument.translated,
+                     argument.r_start,
+                     argument.r_end,
+                     argument.r_iterations,
+                     argument.solution,
+                     argument.value,
+                     argument.steps,
+                     argument.fx_times,
+                     argument.dfx_times,
+                     argument.translated_fx,
+                     argument.name]
+                    )
+        # print(f'{argument.name}, {argument.solution}, {argument.value}, {argument.translated_fx}')
+    print('\n\n')
+    print(tabulate(data, headers=headers))
